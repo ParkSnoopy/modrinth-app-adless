@@ -34,9 +34,19 @@ export const NOTICE_LEVELS: Record<
       bg: 'var(--color-red-bg)',
     },
   },
+  survey: {
+    name: defineMessage({
+      id: 'servers.notice.level.survey.name',
+      defaultMessage: 'Survey',
+    }),
+    colors: {
+      text: 'var(--color-purple)',
+      bg: 'var(--color-purple-bg)',
+    },
+  },
 }
 
-const DISMISSABLE = {
+export const DISMISSABLE = {
   name: defineMessage({
     id: 'servers.notice.dismissable',
     defaultMessage: 'Dismissable',
@@ -47,7 +57,7 @@ const DISMISSABLE = {
   },
 }
 
-const UNDISMISSABLE = {
+export const UNDISMISSABLE = {
   name: defineMessage({
     id: 'servers.notice.undismissable',
     defaultMessage: 'Undismissable',
