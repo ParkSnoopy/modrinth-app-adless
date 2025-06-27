@@ -5,11 +5,11 @@ use crate::state;
 use crate::state::{
     CacheValue, CachedEntry, CachedFile, CachedFileHash, CachedFileUpdate,
     Credentials, DefaultPage, DependencyType, DeviceToken, DeviceTokenKey,
-    DeviceTokenPair, FileType, Hooks, LinkedData, MemorySettings,
-    ModrinthCredentials, Profile, ProfileInstallStage, TeamMember, Theme,
-    VersionFile, WindowSize,
+    DeviceTokenPair, FileType, Hooks, LauncherFeatureVersion, LinkedData,
+    MemorySettings, ModrinthCredentials, Profile, ProfileInstallStage,
+    TeamMember, Theme, VersionFile, WindowSize,
 };
-use crate::util::fetch::{read_json, IoSemaphore};
+use crate::util::fetch::{IoSemaphore, read_json};
 use chrono::{DateTime, Utc};
 use p256::ecdsa::SigningKey;
 use p256::pkcs8::DecodePrivateKey;
@@ -29,9 +29,7 @@ where
         return Ok(());
     };
 
-    let old_launcher_root = if let Some(dir) = default_settings_dir() {
-        dir
-    } else {
+    let Some(old_launcher_root) = default_settings_dir() else {
         return Ok(());
     };
     let old_launcher_root_str = old_launcher_root.to_string_lossy().to_string();
@@ -85,7 +83,7 @@ where
         settings.prev_custom_dir = Some(old_launcher_root_str.clone());
 
         for (_, legacy_version) in legacy_settings.java_globals.0 {
-            if let Ok(Some(java_version)) =
+            if let Ok(java_version) =
                 check_jre(PathBuf::from(legacy_version.path)).await
             {
                 java_version.upsert(exec).await?;
@@ -177,12 +175,10 @@ where
 
                 let profile_path = entry.path().join("profile.json");
 
-                let profile = if let Ok(profile) =
+                let Ok(profile) =
                     read_json::<LegacyProfile>(&profile_path, &io_semaphore)
                         .await
-                {
-                    profile
-                } else {
+                else {
                     continue;
                 };
 
@@ -250,9 +246,11 @@ where
                                                     .metadata
                                                     .game_version
                                                     .clone(),
-                                                loaders: vec![mod_loader
-                                                    .as_str()
-                                                    .to_string()],
+                                                loaders: vec![
+                                                    mod_loader
+                                                        .as_str()
+                                                        .to_string(),
+                                                ],
                                                 update_version_id:
                                                     update_version.id.clone(),
                                             },
@@ -283,7 +281,7 @@ where
 
                                         TeamMember {
                                             team_id: x.team_id,
-                                            user: user.clone(),
+                                            user,
                                             is_owner: x.role == "Owner",
                                             role: x.role,
                                             ordering: x.ordering,
@@ -317,9 +315,11 @@ where
                             ProfileInstallStage::NotInstalled
                         }
                     },
+                    launcher_feature_version: LauncherFeatureVersion::None,
                     name: profile.metadata.name,
                     icon_path: profile.metadata.icon,
                     game_version: profile.metadata.game_version,
+                    protocol_version: None,
                     loader: profile.metadata.loader.into(),
                     loader_version: profile
                         .metadata

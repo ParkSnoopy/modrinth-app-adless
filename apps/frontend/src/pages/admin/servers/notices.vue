@@ -6,17 +6,6 @@
       }}</span>
     </template>
     <div class="flex w-[700px] flex-col gap-3">
-      <div class="flex flex-col gap-2">
-        <label for="notice-message" class="flex flex-col gap-1">
-          <span class="text-lg font-semibold text-contrast">
-            Message
-            <span class="text-brand-red">*</span>
-          </span>
-        </label>
-        <div class="textarea-wrapper">
-          <textarea id="notice-message" v-model="newNoticeMessage" maxlength="256" />
-        </div>
-      </div>
       <div class="flex items-center justify-between gap-2">
         <label for="level-selector" class="flex flex-col gap-1">
           <span class="text-lg font-semibold text-contrast"> Level </span>
@@ -31,7 +20,38 @@
           name="Level"
         />
       </div>
-      <div class="flex items-center justify-between gap-2">
+      <div v-if="!newNoticeSurvey" class="flex flex-col gap-2">
+        <label for="notice-title" class="flex flex-col gap-1">
+          <span class="text-lg font-semibold text-contrast"> Title </span>
+        </label>
+        <input
+          id="notice-title"
+          v-model="newNoticeTitle"
+          placeholder="E.g. Maintenance"
+          type="text"
+          autocomplete="off"
+        />
+      </div>
+      <div class="flex flex-col gap-2">
+        <label for="notice-message" class="flex flex-col gap-1">
+          <span class="text-lg font-semibold text-contrast">
+            {{ newNoticeSurvey ? "Survey ID" : "Message" }}
+            <span class="text-brand-red">*</span>
+          </span>
+        </label>
+        <input
+          v-if="newNoticeSurvey"
+          id="notice-message"
+          v-model="newNoticeMessage"
+          placeholder="E.g. rXGtq2"
+          type="text"
+          autocomplete="off"
+        />
+        <div v-else class="textarea-wrapper h-32">
+          <textarea id="notice-message" v-model="newNoticeMessage" />
+        </div>
+      </div>
+      <div v-if="!newNoticeSurvey" class="flex items-center justify-between gap-2">
         <label for="dismissable-toggle" class="flex flex-col gap-1">
           <span class="text-lg font-semibold text-contrast"> Dismissable </span>
           <span>Allow users to dismiss the notice from their panel.</span>
@@ -63,7 +83,7 @@
         />
       </div>
 
-      <div class="flex flex-col gap-2">
+      <div v-if="!newNoticeSurvey" class="flex flex-col gap-2">
         <span class="text-lg font-semibold text-contrast"> Preview </span>
         <ServerNotice
           :level="newNoticeLevel.id"
@@ -73,6 +93,7 @@
               : trimmedMessage
           "
           :dismissable="newNoticeDismissable"
+          :title="trimmedTitle"
           preview
         />
       </div>
@@ -135,7 +156,7 @@
             <div class="text-sm">
               <span v-if="notice.announce_at">
                 {{ dayjs(notice.announce_at).format("MMM D, YYYY [at] h:mm A") }} ({{
-                  dayjs(notice.announce_at).fromNow()
+                  formatRelativeTime(notice.announce_at)
                 }})
               </span>
               <template v-else> Never begins </template>
@@ -145,7 +166,7 @@
                 v-if="notice.expires"
                 v-tooltip="dayjs(notice.expires).format('MMMM D, YYYY [at] h:mm A')"
               >
-                {{ dayjs(notice.expires).fromNow() }}
+                {{ formatRelativeTime(notice.expires) }}
               </span>
               <template v-else> Never expires </template>
             </div>
@@ -197,6 +218,7 @@
               :level="notice.level"
               :message="notice.message"
               :dismissable="notice.dismissable"
+              :title="notice.title"
               preview
             />
             <div class="mt-4 flex items-center gap-2">
@@ -224,6 +246,10 @@
                 <SettingsIcon />
                 Edit assignments
               </button>
+              <template v-if="notice.dismissed_by.length > 0">
+                •
+                <span> Dismissed by {{ notice.dismissed_by.length }} servers </span>
+              </template>
             </div>
           </div>
         </div>
@@ -241,6 +267,7 @@ import {
   NewModal,
   TeleportDropdownMenu,
   Toggle,
+  useRelativeTime,
 } from "@modrinth/ui";
 import { SettingsIcon, PlusIcon, SaveIcon, TrashIcon, EditIcon, XIcon } from "@modrinth/assets";
 import dayjs from "dayjs";
@@ -248,10 +275,12 @@ import { useVIntl } from "@vintl/vintl";
 import type { ServerNotice as ServerNoticeType } from "@modrinth/utils";
 import { computed } from "vue";
 import { NOTICE_LEVELS } from "@modrinth/ui/src/utils/notices.ts";
-import { usePyroFetch } from "~/composables/pyroFetch.ts";
+import { useServersFetch } from "~/composables/servers/servers-fetch.ts";
 import AssignNoticeModal from "~/components/ui/servers/notice/AssignNoticeModal.vue";
 
 const { formatMessage } = useVIntl();
+const formatRelativeTime = useRelativeTime();
+
 const app = useNuxtApp() as unknown as { $notify: any };
 
 const notices = ref<ServerNoticeType[]>([]);
@@ -261,7 +290,7 @@ const assignNoticeModal = ref<InstanceType<typeof AssignNoticeModal>>();
 await refreshNotices();
 
 async function refreshNotices() {
-  await usePyroFetch("notices").then((res) => {
+  await useServersFetch("notices").then((res) => {
     notices.value = res as ServerNoticeType[];
     notices.value.sort((a, b) => {
       const dateDiff = dayjs(b.announce_at).diff(dayjs(a.announce_at));
@@ -285,6 +314,7 @@ const newNoticeLevel = ref(levelOptions[0]);
 const newNoticeDismissable = ref(false);
 const newNoticeMessage = ref("");
 const newNoticeScheduledDate = ref<string>();
+const newNoticeTitle = ref<string>();
 const newNoticeExpiresDate = ref<string>();
 
 function openNewNoticeModal() {
@@ -303,6 +333,7 @@ function startEditing(notice: ServerNoticeType, assignments: boolean = false) {
   newNoticeLevel.value = levelOptions.find((x) => x.id === notice.level) ?? levelOptions[0];
   newNoticeDismissable.value = notice.dismissable;
   newNoticeMessage.value = notice.message;
+  newNoticeTitle.value = notice.title;
   newNoticeScheduledDate.value = dayjs(notice.announce_at).format(DATE_TIME_FORMAT);
   newNoticeExpiresDate.value = notice.expires
     ? dayjs(notice.expires).format(DATE_TIME_FORMAT)
@@ -316,7 +347,7 @@ function startEditing(notice: ServerNoticeType, assignments: boolean = false) {
 }
 
 async function deleteNotice(notice: ServerNoticeType) {
-  await usePyroFetch(`notices/${notice.id}`, {
+  await useServersFetch(`notices/${notice.id}`, {
     method: "DELETE",
   })
     .then(() => {
@@ -338,6 +369,8 @@ async function deleteNotice(notice: ServerNoticeType) {
 }
 
 const trimmedMessage = computed(() => newNoticeMessage.value?.trim());
+const trimmedTitle = computed(() => newNoticeTitle.value?.trim());
+const newNoticeSurvey = computed(() => newNoticeLevel.value.id === "survey");
 
 const noticeSubmitError = computed(() => {
   let error: undefined | string;
@@ -368,17 +401,18 @@ async function saveChanges() {
     return;
   }
 
-  await usePyroFetch(`notices/${editingNotice.value?.id}`, {
+  await useServersFetch(`notices/${editingNotice.value?.id}`, {
     method: "PATCH",
     body: {
       message: newNoticeMessage.value,
+      title: newNoticeSurvey.value ? undefined : trimmedTitle.value,
       level: newNoticeLevel.value.id,
-      dismissable: newNoticeDismissable.value,
+      dismissable: newNoticeSurvey.value ? true : newNoticeDismissable.value,
       announce_at: newNoticeScheduledDate.value
         ? dayjs(newNoticeScheduledDate.value).toISOString()
         : dayjs().toISOString(),
       expires: newNoticeExpiresDate.value
-        ? dayjs(newNoticeScheduledDate.value).toISOString()
+        ? dayjs(newNoticeExpiresDate.value).toISOString()
         : undefined,
     },
   }).catch((err) => {
@@ -398,14 +432,19 @@ async function createNotice() {
     return;
   }
 
-  await usePyroFetch("notices", {
+  await useServersFetch("notices", {
     method: "POST",
     body: {
       message: newNoticeMessage.value,
+      title: newNoticeSurvey.value ? undefined : trimmedTitle.value,
       level: newNoticeLevel.value.id,
-      dismissable: newNoticeDismissable.value,
-      announce_at: newNoticeScheduledDate.value ?? dayjs().toISOString(),
-      expires: newNoticeExpiresDate.value,
+      dismissable: newNoticeSurvey.value ? true : newNoticeDismissable.value,
+      announce_at: newNoticeScheduledDate.value
+        ? dayjs(newNoticeScheduledDate.value).toISOString()
+        : dayjs().toISOString(),
+      expires: newNoticeExpiresDate.value
+        ? dayjs(newNoticeExpiresDate.value).toISOString()
+        : undefined,
     },
   }).catch((err) => {
     app.$notify({

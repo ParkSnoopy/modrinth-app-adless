@@ -185,7 +185,7 @@
                       <CalendarIcon aria-hidden="true" />
                       <span>
                         Received
-                        {{ fromNow(notification.date_modified) }}
+                        {{ formatRelativeTime(notification.date_modified) }}
                       </span>
                     </div>
                   </div>
@@ -527,7 +527,7 @@
 </template>
 <script setup>
 import { Multiselect } from "vue-multiselect";
-import { ButtonStyled } from "@modrinth/ui";
+import { Avatar, ButtonStyled, useRelativeTime } from "@modrinth/ui";
 import {
   CompassIcon,
   LogInIcon,
@@ -539,10 +539,11 @@ import {
 } from "@modrinth/assets";
 import PrismLauncherLogo from "~/assets/images/external/prism.svg?component";
 import ATLauncherLogo from "~/assets/images/external/atlauncher.svg?component";
-import Avatar from "~/components/ui/Avatar.vue";
 import ProjectCard from "~/components/ui/ProjectCard.vue";
 
 import { homePageProjects, homePageSearch, homePageNotifs } from "~/generated/state.json";
+
+const formatRelativeTime = useRelativeTime();
 
 const searchQuery = ref("leave");
 const sortType = ref("relevance");
