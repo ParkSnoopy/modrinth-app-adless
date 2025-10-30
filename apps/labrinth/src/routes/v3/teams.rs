@@ -1,4 +1,4 @@
-use crate::auth::checks::is_visible_project;
+use crate::auth::checks::{is_visible_organization, is_visible_project};
 use crate::auth::get_user_from_headers;
 use crate::database::DBProject;
 use crate::database::models::notification_item::NotificationBuilder;
@@ -134,18 +134,21 @@ pub async fn team_members_get_organization(
         crate::database::models::DBOrganization::get(&string, &**pool, &redis)
             .await?;
 
-    if let Some(organization) = organization_data {
-        let current_user = get_user_from_headers(
-            &req,
-            &**pool,
-            &redis,
-            &session_queue,
-            Scopes::ORGANIZATION_READ,
-        )
-        .await
-        .map(|x| x.1)
-        .ok();
+    let current_user = get_user_from_headers(
+        &req,
+        &**pool,
+        &redis,
+        &session_queue,
+        Scopes::ORGANIZATION_READ,
+    )
+    .await
+    .map(|x| x.1)
+    .ok();
 
+    if let Some(organization) = organization_data
+        && is_visible_organization(&organization, &current_user, &pool, &redis)
+            .await?
+    {
         let members_data = DBTeamMember::get_from_team_full(
             organization.team_id,
             &**pool,
@@ -767,12 +770,13 @@ pub async fn edit_team_member(
                 ));
             }
 
-            if let Some(new_permissions) = edit_member.permissions {
-                if !permissions.contains(new_permissions) {
-                    return Err(ApiError::InvalidInput(
-                        "The new permissions have permissions that you don't have".to_string(),
-                    ));
-                }
+            if let Some(new_permissions) = edit_member.permissions
+                && !permissions.contains(new_permissions)
+            {
+                return Err(ApiError::InvalidInput(
+                    "The new permissions have permissions that you don't have"
+                        .to_string(),
+                ));
             }
 
             if edit_member.organization_permissions.is_some() {
@@ -800,13 +804,12 @@ pub async fn edit_team_member(
             }
 
             if let Some(new_permissions) = edit_member.organization_permissions
+                && !organization_permissions.contains(new_permissions)
             {
-                if !organization_permissions.contains(new_permissions) {
-                    return Err(ApiError::InvalidInput(
+                return Err(ApiError::InvalidInput(
                         "The new organization permissions have permissions that you don't have"
                             .to_string(),
                     ));
-                }
             }
 
             if edit_member.permissions.is_some()
@@ -822,13 +825,13 @@ pub async fn edit_team_member(
         }
     }
 
-    if let Some(payouts_split) = edit_member.payouts_split {
-        if payouts_split < Decimal::ZERO || payouts_split > Decimal::from(5000)
-        {
-            return Err(ApiError::InvalidInput(
-                "Payouts split must be between 0 and 5000!".to_string(),
-            ));
-        }
+    if let Some(payouts_split) = edit_member.payouts_split
+        && (payouts_split < Decimal::ZERO
+            || payouts_split > Decimal::from(5000))
+    {
+        return Err(ApiError::InvalidInput(
+            "Payouts split must be between 0 and 5000!".to_string(),
+        ));
     }
 
     DBTeamMember::edit_team_member(
@@ -878,18 +881,18 @@ pub async fn transfer_ownership(
 
     // Forbid transferring ownership of a project team that is owned by an organization
     // These are owned by the organization owner, and must be removed from the organization first
-    // There shouldnt be an ownr on these projects in these cases, but just in case.
+    // There shouldnt be an owner on these projects in these cases, but just in case.
     let team_association_id =
         DBTeam::get_association(id.into(), &**pool).await?;
     if let Some(TeamAssociationId::Project(pid)) = team_association_id {
         let result = DBProject::get_id(pid, &**pool, &redis).await?;
-        if let Some(project_item) = result {
-            if project_item.inner.organization_id.is_some() {
-                return Err(ApiError::InvalidInput(
+        if let Some(project_item) = result
+            && project_item.inner.organization_id.is_some()
+        {
+            return Err(ApiError::InvalidInput(
                     "You cannot transfer ownership of a project team that is owend by an organization"
                         .to_string(),
                 ));
-            }
         }
     }
 
@@ -1018,7 +1021,21 @@ pub async fn transfer_ownership(
             vec![]
         };
 
+    // If this team is associated with a project, notify the new owner
+    if let Some(TeamAssociationId::Project(pid)) = team_association_id {
+        NotificationBuilder {
+            body: NotificationBody::ProjectTransferred {
+                project_id: pid.into(),
+                new_owner_user_id: Some(new_owner.user_id),
+                new_owner_organization_id: None,
+            },
+        }
+        .insert(new_owner.user_id.into(), &mut transaction, &redis)
+        .await?;
+    }
+
     transaction.commit().await?;
+
     DBTeamMember::clear_cache(id.into(), &redis).await?;
     for team_id in project_teams_edited {
         DBTeamMember::clear_cache(team_id, &redis).await?;

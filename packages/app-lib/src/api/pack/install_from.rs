@@ -6,6 +6,7 @@ use crate::state::{CachedEntry, LinkedData, ProfileInstallStage, SideType};
 use crate::util::fetch::{fetch, fetch_advanced, write_cached_icon};
 use crate::util::io;
 
+use path_util::SafeRelativeUtf8UnixPathBuf;
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -27,7 +28,7 @@ pub struct PackFormat {
 #[derive(Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PackFile {
-    pub path: String,
+    pub path: SafeRelativeUtf8UnixPathBuf,
     pub hashes: HashMap<PackFileHash, String>,
     pub env: Option<HashMap<EnvType, SideType>>,
     pub downloads: Vec<String>,
@@ -383,18 +384,18 @@ pub async fn set_profile_information(
             .unwrap_or_else(|| backup_name.to_string());
         prof.install_stage = ProfileInstallStage::PackInstalling;
 
-        if let Some(ref project_id) = description.project_id {
-            if let Some(ref version_id) = description.version_id {
-                prof.linked_data = Some(LinkedData {
-                    project_id: project_id.clone(),
-                    version_id: version_id.clone(),
-                    locked: if !ignore_lock {
-                        true
-                    } else {
-                        prof.linked_data.as_ref().is_none_or(|x| x.locked)
-                    },
-                })
-            }
+        if let Some(ref project_id) = description.project_id
+            && let Some(ref version_id) = description.version_id
+        {
+            prof.linked_data = Some(LinkedData {
+                project_id: project_id.clone(),
+                version_id: version_id.clone(),
+                locked: if !ignore_lock {
+                    true
+                } else {
+                    prof.linked_data.as_ref().is_none_or(|x| x.locked)
+                },
+            })
         }
 
         prof.icon_path = description
