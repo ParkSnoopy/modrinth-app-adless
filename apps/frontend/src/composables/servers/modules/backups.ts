@@ -1,79 +1,109 @@
-import type { Backup, AutoBackupSettings } from "@modrinth/utils";
-import { useServersFetch } from "../servers-fetch.ts";
-import { ServerModule } from "./base.ts";
+import type { AutoBackupSettings, Backup } from '@modrinth/utils'
+
+import { useServersFetch } from '../servers-fetch.ts'
+import { ServerModule } from './base.ts'
 
 export class BackupsModule extends ServerModule {
-  data: Backup[] = [];
+	data: Backup[] = []
 
-  async fetch(): Promise<void> {
-    this.data = await useServersFetch<Backup[]>(`servers/${this.serverId}/backups`, {}, "backups");
-  }
+	async fetch(): Promise<void> {
+		this.data = await useServersFetch<Backup[]>(`servers/${this.serverId}/backups`, {}, 'backups')
+	}
 
-  async create(backupName: string): Promise<string> {
-    const response = await useServersFetch<{ id: string }>(`servers/${this.serverId}/backups`, {
-      method: "POST",
-      body: { name: backupName },
-    });
-    await this.fetch(); // Refresh this module
-    return response.id;
-  }
+	async create(backupName: string): Promise<string> {
+		const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(7)}`
+		const tempBackup: Backup = {
+			id: tempId,
+			name: backupName,
+			created_at: new Date().toISOString(),
+			locked: false,
+			automated: false,
+			interrupted: false,
+			ongoing: true,
+			task: { create: { progress: 0, state: 'ongoing' } },
+		}
+		this.data.push(tempBackup)
 
-  async rename(backupId: string, newName: string): Promise<void> {
-    await useServersFetch(`servers/${this.serverId}/backups/${backupId}/rename`, {
-      method: "POST",
-      body: { name: newName },
-    });
-    await this.fetch(); // Refresh this module
-  }
+		try {
+			const response = await useServersFetch<{ id: string }>(`servers/${this.serverId}/backups`, {
+				method: 'POST',
+				body: { name: backupName },
+			})
 
-  async delete(backupId: string): Promise<void> {
-    await useServersFetch(`servers/${this.serverId}/backups/${backupId}`, {
-      method: "DELETE",
-    });
-    await this.fetch(); // Refresh this module
-  }
+			const backup = this.data.find((b) => b.id === tempId)
+			if (backup) {
+				backup.id = response.id
+			}
 
-  async restore(backupId: string): Promise<void> {
-    await useServersFetch(`servers/${this.serverId}/backups/${backupId}/restore`, {
-      method: "POST",
-    });
-    await this.fetch(); // Refresh this module
-  }
+			return response.id
+		} catch (error) {
+			this.data = this.data.filter((b) => b.id !== tempId)
+			throw error
+		}
+	}
 
-  async prepare(backupId: string): Promise<void> {
-    await useServersFetch(`servers/${this.serverId}/backups/${backupId}/prepare-download`, {
-      method: "POST",
-    });
-  }
+	async rename(backupId: string, newName: string): Promise<void> {
+		await useServersFetch(`servers/${this.serverId}/backups/${backupId}/rename`, {
+			method: 'POST',
+			body: { name: newName },
+		})
+		await this.fetch()
+	}
 
-  async lock(backupId: string): Promise<void> {
-    await useServersFetch(`servers/${this.serverId}/backups/${backupId}/lock`, {
-      method: "POST",
-    });
-    await this.fetch(); // Refresh this module
-  }
+	async delete(backupId: string): Promise<void> {
+		await useServersFetch(`servers/${this.serverId}/backups/${backupId}`, {
+			method: 'DELETE',
+		})
+		await this.fetch()
+	}
 
-  async unlock(backupId: string): Promise<void> {
-    await useServersFetch(`servers/${this.serverId}/backups/${backupId}/unlock`, {
-      method: "POST",
-    });
-    await this.fetch(); // Refresh this module
-  }
+	async restore(backupId: string): Promise<void> {
+		const backup = this.data.find((b) => b.id === backupId)
+		if (backup) {
+			if (!backup.task) backup.task = {}
+			backup.task.restore = { progress: 0, state: 'ongoing' }
+		}
 
-  async retry(backupId: string): Promise<void> {
-    await useServersFetch(`servers/${this.serverId}/backups/${backupId}/retry`, {
-      method: "POST",
-    });
-  }
+		try {
+			await useServersFetch(`servers/${this.serverId}/backups/${backupId}/restore`, {
+				method: 'POST',
+			})
+		} catch (error) {
+			if (backup?.task?.restore) {
+				delete backup.task.restore
+			}
+			throw error
+		}
+	}
 
-  async updateAutoBackup(autoBackup: "enable" | "disable", interval: number): Promise<void> {
-    await useServersFetch(`servers/${this.serverId}/autobackup`, {
-      method: "POST",
-      body: { set: autoBackup, interval },
-    });
-  }
+	async lock(backupId: string): Promise<void> {
+		await useServersFetch(`servers/${this.serverId}/backups/${backupId}/lock`, {
+			method: 'POST',
+		})
+		await this.fetch()
+	}
 
-  async getAutoBackup(): Promise<AutoBackupSettings> {
-    return await useServersFetch(`servers/${this.serverId}/autobackup`);
-  }
+	async unlock(backupId: string): Promise<void> {
+		await useServersFetch(`servers/${this.serverId}/backups/${backupId}/unlock`, {
+			method: 'POST',
+		})
+		await this.fetch()
+	}
+
+	async retry(backupId: string): Promise<void> {
+		await useServersFetch(`servers/${this.serverId}/backups/${backupId}/retry`, {
+			method: 'POST',
+		})
+	}
+
+	async updateAutoBackup(autoBackup: 'enable' | 'disable', interval: number): Promise<void> {
+		await useServersFetch(`servers/${this.serverId}/autobackup`, {
+			method: 'POST',
+			body: { set: autoBackup, interval },
+		})
+	}
+
+	async getAutoBackup(): Promise<AutoBackupSettings> {
+		return await useServersFetch(`servers/${this.serverId}/autobackup`)
+	}
 }

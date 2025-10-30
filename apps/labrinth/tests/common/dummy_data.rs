@@ -292,7 +292,7 @@ pub async fn add_dummy_data(api: &ApiV3, db: TemporaryDatabase) -> DummyData {
     let pool = &db.pool.clone();
 
     pool.execute(
-        include_str!("../files/dummy_data.sql")
+        include_str!("../fixtures/dummy_data.sql")
             .replace("$1", &Scopes::all().bits().to_string())
             .as_str(),
     )
@@ -390,7 +390,7 @@ pub async fn add_project_beta(api: &ApiV3) -> (Project, Version) {
 }
 
 pub async fn add_organization_zeta(api: &ApiV3) -> Organization {
-    // Add an organzation.
+    // Add an organization.
     let req = TestRequest::post()
         .uri("/v3/organization")
         .append_pat(USER_USER_PAT)
