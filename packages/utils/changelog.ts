@@ -11,6 +11,48 @@ export type VersionEntry = {
 
 const VERSIONS: VersionEntry[] = [
 	{
+		date: `2025-11-10T11:20:00-07:00`,
+		product: 'app',
+		version: '0.10.18',
+		body: `## Improvements
+- Fixed automatic dependency resolution ignoring the selected mod loader.`,
+	},
+	{
+		date: `2025-11-07T21:10:00-07:00`,
+		product: 'web',
+		body: `## Improvements
+- Enhanced syntax highlighting support for skript, mcfunction, and kubejs code blocks in Markdown descriptions.`,
+	},
+	{
+		date: `2025-11-07T15:45:00-07:00`,
+		product: 'web',
+		body: `## Improvements
+- Fixed download button pop-up on Resource Pack projects.`,
+	},
+	{
+		date: `2025-11-07T09:30:00-07:00`,
+		product: 'app',
+		version: '0.10.17',
+		body: `## Improvements
+- Sorting and grouping options in the Library page are now persistent.
+- Instance content filters are now remembered until you close the app.
+- Improved performance when 'Advanced rendering' is disabled, especially on Linux.
+- Fixed account list not being scrollable.
+- Fixed glitchy text selection in Logs page.`,
+	},
+	{
+		date: `2025-11-07T09:30:00-07:00`,
+		product: 'web',
+		body: `## Improvements
+- Fixed 'Advanced rendering' toggle not working properly on many popups.`,
+	},
+	{
+		date: `2025-11-07T08:05:00-07:00`,
+		product: 'web',
+		body: `## Improvements
+- Fixed some further issues with the new withdrawal experience.`,
+	},
+	{
 		date: `2025-11-04T18:20:00-07:00`,
 		product: 'web',
 		body: `## Improvements
