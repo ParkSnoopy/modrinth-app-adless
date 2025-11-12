@@ -477,7 +477,7 @@
 							{
 								id: 'servers-nodes',
 								color: 'primary',
-								link: '/admin/servers/nodes',
+								action: (event) => $refs.modal_batch_credit.show(event),
 								shown: isAdmin(auth.user),
 							},
 						]"
@@ -786,6 +786,7 @@
 			<ProjectCreateModal v-if="auth.user" ref="modal_creation" />
 			<CollectionCreateModal ref="modal_collection_creation" />
 			<OrganizationCreateModal ref="modal_organization_creation" />
+			<BatchCreditModal v-if="auth.user && isAdmin(auth.user)" ref="modal_batch_credit" />
 			<slot id="main" />
 		</main>
 		<footer
@@ -937,6 +938,7 @@ import { isAdmin, isStaff, UserBadge } from '@modrinth/utils'
 import { IntlFormatted } from '@vintl/vintl/components'
 
 import TextLogo from '~/components/brand/TextLogo.vue'
+import BatchCreditModal from '~/components/ui/admin/BatchCreditModal.vue'
 import CollectionCreateModal from '~/components/ui/create/CollectionCreateModal.vue'
 import OrganizationCreateModal from '~/components/ui/create/OrganizationCreateModal.vue'
 import ProjectCreateModal from '~/components/ui/create/ProjectCreateModal.vue'
@@ -1820,7 +1822,7 @@ const footerLinks = [
 		padding-bottom: var(--size-rounded-card);
 		left: 0;
 		background-color: var(--color-raised-bg);
-		z-index: 6;
+		z-index: 11; // 20 = modals, 10 = svg icons
 		transform: translateY(100%);
 		transition: transform 0.4s cubic-bezier(0.54, 0.84, 0.42, 1);
 		border-radius: var(--size-rounded-card) var(--size-rounded-card) 0 0;
@@ -1901,7 +1903,7 @@ const footerLinks = [
 		bottom: 0;
 		background-color: var(--color-raised-bg);
 		box-shadow: 0 0 20px 2px rgba(0, 0, 0, 0.3);
-		z-index: 7;
+		z-index: 11; // 20 = modals, 10 = svg icons
 		width: 100%;
 		align-items: center;
 		justify-content: space-between;
