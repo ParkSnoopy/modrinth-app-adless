@@ -1,5 +1,5 @@
 <script setup>
-import { AuthFeature, TauriModrinthClient } from '@modrinth/api-client'
+import { AuthFeature, PanelVersionFeature, TauriModrinthClient } from '@modrinth/api-client'
 import {
 	ArrowBigUpDashIcon,
 	ChangeSkinIcon,
@@ -115,6 +115,7 @@ const tauriApiClient = new TauriModrinthClient({
 		new AuthFeature({
 			token: async () => (await getCreds()).session,
 		}),
+		new PanelVersionFeature(),
 	],
 })
 provideModrinthClient(tauriApiClient)
@@ -794,7 +795,7 @@ provideAppUpdateDownloadProgress(appUpdateDownload)
 			<NavButton
 				v-if="themeStore.featureFlags.servers_in_app"
 				v-tooltip.right="'Servers'"
-				to="/servers/manage"
+				to="/hosting/manage"
 			>
 				<ServerIcon />
 			</NavButton>
