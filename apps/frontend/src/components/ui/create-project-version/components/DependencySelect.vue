@@ -4,9 +4,10 @@
 		placeholder="Select project"
 		:options="options"
 		:searchable="true"
-		search-placeholder="Search by name, slug, or paste ID..."
+		search-placeholder="Search by name or paste ID..."
 		:no-options-message="searchLoading ? 'Loading...' : 'No results found'"
 		@search-input="(query) => handleSearch(query)"
+		:disableSearchFilter="true"
 	/>
 </template>
 
@@ -25,7 +26,8 @@ const options = ref<DropdownOption<string>[]>([])
 const { labrinth } = injectModrinthClient()
 
 const search = async (query: string) => {
-	if (!query.trim()) {
+	query = query.trim()
+	if (!query) {
 		searchLoading.value = false
 		return
 	}
@@ -34,10 +36,24 @@ const search = async (query: string) => {
 		const results = await labrinth.projects_v2.search({
 			query: query,
 			limit: 20,
-			facets: [['project_type:mod']],
+			facets: [
+				[
+					'project_type:mod',
+					'project_type:plugin',
+					'project_type:shader ',
+					'project_type:resourcepack',
+					'project_type:datapack',
+				],
+			],
 		})
 
-		options.value = results.hits.map((hit) => ({
+		const resultsByProjectId = await labrinth.projects_v2.search({
+			query: '',
+			limit: 20,
+			facets: [[`project_id:${query.replace(/[^a-zA-Z0-9]/g, '')}`]], // remove any non-alphanumeric characters
+		})
+
+		options.value = [...resultsByProjectId.hits, ...results.hits].map((hit) => ({
 			label: hit.title,
 			value: hit.project_id,
 			icon: defineAsyncComponent(() =>
